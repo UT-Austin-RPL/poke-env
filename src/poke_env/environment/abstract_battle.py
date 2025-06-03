@@ -446,7 +446,11 @@ class AbstractBattle(ABC):
             if event[-1].startswith("[spread]"):
                 event = event[:-1]
 
-            if event[-1] in {"[from]lockedmove", "[from]Pursuit", "[zeffect]"}:
+            if event[-1].replace(" ", "") in {
+                "[from]lockedmove",
+                "[from]Pursuit",
+                "[zeffect]",
+            }:
                 event = event[:-1]
 
             if event[-1].startswith("[anim]"):
@@ -787,13 +791,31 @@ class AbstractBattle(ABC):
             source, target, stats = event[2:5]
             source_mon = self.get_pokemon(source)
             target_mon = self.get_pokemon(target)
-            # JAKE: I have a manual patch for guardswap in the metamon version.
-            # TODO: check guardswap.
-            for stat in stats.split(", "):
-                source_mon.boosts[stat], target_mon.boosts[stat] = (
-                    target_mon.boosts[stat],
-                    source_mon.boosts[stat],
-                )
+            if "[from]" in stats:
+                if "guardswap" in stats:
+                    # JAKE: need to use metamon to check if this ever triggers
+                    all_stats = ["def", "spd"]
+                else:
+                    all_stats = [
+                        "accuracy",
+                        "atk",
+                        "def",
+                        "evasion",
+                        "spa",
+                        "spd",
+                        "spe",
+                    ]
+                for stat in all_stats:
+                    source_mon.boosts[stat], target_mon.boosts[stat] = (
+                        target_mon.boosts[stat],
+                        source_mon.boosts[stat],
+                    )
+            else:
+                for stat in stats.split(", "):
+                    source_mon.boosts[stat], target_mon.boosts[stat] = (
+                        target_mon.boosts[stat],
+                        source_mon.boosts[stat],
+                    )
         elif event[1] == "-transform":
             pokemon, into = event[2:4]
             self.get_pokemon(pokemon).transform(self.get_pokemon(into))
