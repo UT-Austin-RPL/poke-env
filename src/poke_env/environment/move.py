@@ -80,7 +80,7 @@ class Move:
         "_dynamaxed_move",
         "_gen",
         "_is_empty",
-        "_moves_dict",
+        "_gen_data",
         "_request_target",
     )
 
@@ -88,7 +88,7 @@ class Move:
         self._id = move_id
         self._base_power_override = None
         self._gen = gen
-        self._moves_dict = GenData.from_gen(gen).moves
+        self._gen_data = GenData.from_gen(gen)
 
         if move_id.startswith("hiddenpower") and raw_id is not None:
             base_power = "".join([c for c in raw_id if c.isdigit()])
@@ -105,6 +105,11 @@ class Move:
 
         self._dynamaxed_move = None
         self._request_target = None
+
+    @property
+    def _moves_dict(self) -> Dict[str, Any]:
+        # we'll only need the moves dict, but let GenData shallow copy
+        return self._gen_data.moves
 
     def __repr__(self) -> str:
         return f"{self._id} (Move object)"
