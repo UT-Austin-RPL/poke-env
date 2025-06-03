@@ -51,10 +51,15 @@ class SideCondition(Enum):
         message = message.replace("move: ", "")
         message = message.replace(" ", "_")
         message = message.replace("-", "_")
-
+        condition_code = message.upper()
         try:
-            return SideCondition[message.upper()]
+            return SideCondition[condition_code]
         except KeyError:
+            # hack attempt to catch conditions w/ inconsistent spacing (mainly in old replays)
+            # JAKE: recheck this on v0.8.3
+            for known_condition in SideCondition:
+                if known_condition.name.replace("_", "") == condition_code:
+                    return known_condition
             logging.getLogger("poke-env").warning(
                 "Unexpected side condition '%s' received. SideCondition.UNKNOWN will be"
                 " used instead. If this is unexpected, please open an issue at "
