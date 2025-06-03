@@ -34,7 +34,15 @@ class GenData:
         with open(
             os.path.join(self._static_files_root, "moves", f"gen{gen}moves.json")
         ) as f:
-            return orjson.loads(f.read())
+            data = orjson.loads(f.read())
+
+        # manually fix data entries gathered from Showdown data files
+        if gen == 1:
+            data["recover"]["heal"] = [1, 2]
+            data["softboiled"]["heal"] = [1, 2]
+            # TODO: check vicegrip / visegrip
+
+        return data
 
     def load_natures(self) -> Dict[str, Dict[str, Union[int, float]]]:
         with open(os.path.join(self._static_files_root, "natures.json")) as f:
