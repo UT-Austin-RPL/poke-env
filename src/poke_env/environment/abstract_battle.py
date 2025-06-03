@@ -638,7 +638,10 @@ class AbstractBattle(ABC):
                     self.opponent_can_dynamax = False
         elif event[1] == "-activate":
             target, effect = event[2:4]
-            if target and effect == "move: Skill Swap":
+            if effect.startswith("ability: "):
+                ability = effect[9:]
+                self.get_pokemon(target).ability = ability
+            elif target and effect == "move: Skill Swap":
                 self.get_pokemon(target).start_effect(effect, event[4:6])
                 actor = event[6].replace("[of] ", "")
                 self.get_pokemon(actor).set_temporary_ability(event[5])
