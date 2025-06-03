@@ -350,7 +350,7 @@ class OpenAIGymEnv(
             return obs, 0.0, False, False, info
         if self.current_battle.finished:
             raise RuntimeError("Battle is already finished, call reset")
-        battle = copy.copy(self.current_battle)
+        battle = copy.deepcopy(self.current_battle)
         battle.logger = None
         self.last_battle = battle
         self._actions.put(action)
