@@ -72,6 +72,10 @@ class GenData:
         dex.update(other_forms_dex)
 
         for name, value in dex.items():
+            if gen <= 2 and "abilities" in value:
+                # remove abilities from gen 1-2
+                # JAKE: check if this is still the way to handle this
+                value["abilities"] = {"0": "No Ability"}
             if "baseSpecies" in value:
                 value["species"] = value["baseSpecies"]
             else:

@@ -39,6 +39,7 @@ class AbstractBattle(ABC):
         "J",
         "L",
         "askreg",
+        "badge",
         "c",
         "chat",
         "crit",
@@ -54,8 +55,10 @@ class AbstractBattle(ABC):
         "l",
         "leave",
         "n",
+        "noinit",
         "name",
         "rated",
+        "rename",
         "resisted",
         "sentchoice",
         "split",
@@ -668,7 +671,10 @@ class AbstractBattle(ABC):
                     self.opponent_can_dynamax = False
         elif event[1] == "-activate":
             target, effect = event[2:4]
-            if target and effect == "move: Skill Swap":
+            if effect.startswith("ability: "):
+                ability = effect[9:]
+                self.get_pokemon(target).ability = ability
+            elif target and effect == "move: Skill Swap":
                 self.get_pokemon(target).start_effect(effect, event[4:6])
                 actor = event[6].replace("[of] ", "")
                 self.get_pokemon(actor).set_temporary_ability(event[5])
@@ -816,7 +822,19 @@ class AbstractBattle(ABC):
             source_mon = self.get_pokemon(source)
             target_mon = self.get_pokemon(target)
             if "[from]" in stats:
-                all_stats = ["accuracy", "atk", "def", "evasion", "spa", "spd", "spe"]
+                # JAKE: check if this is still the way to handle this
+                if "guardswap" in stats:
+                    all_stats = ["def", "spd"]
+                else:
+                    all_stats = [
+                        "accuracy",
+                        "atk",
+                        "def",
+                        "evasion",
+                        "spa",
+                        "spd",
+                        "spe",
+                    ]
                 for stat in all_stats:
                     source_mon.boosts[stat], target_mon.boosts[stat] = (
                         target_mon.boosts[stat],
@@ -973,7 +991,7 @@ class AbstractBattle(ABC):
         else:
             conditions = self.opponent_side_conditions
         condition = SideCondition.from_showdown_message(condition_str)
-        if condition is not SideCondition.UNKNOWN:
+        if condition is not SideCondition.UNKNOWN and condition in conditions:
             conditions.pop(condition)
 
     def _side_start(self, side: str, condition_str: str):

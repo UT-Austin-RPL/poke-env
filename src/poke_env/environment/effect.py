@@ -23,6 +23,7 @@ class Effect(Enum):
     BANEFUL_BUNKER = auto()
     BATTLE_BOND = auto()
     BEAK_BLAST = auto()
+    BEAT_UP = auto()
     BIDE = auto()
     BIND = auto()
     BURNING_BULWARK = auto()
@@ -84,7 +85,9 @@ class Effect(Enum):
     G_MAX_ONE_BLOW = auto()
     G_MAX_RAPID_FLOW = auto()
     G_MAX_SANDBLAST = auto()
+    GOOEY = auto()
     HADRON_ENGINE = auto()
+    HAZE = auto()
     HEAL_BELL = auto()
     HEAL_BLOCK = auto()
     HEALER = auto()
@@ -107,6 +110,7 @@ class Effect(Enum):
     LEECH_SEED = auto()
     LEPPA_BERRY = auto()
     LIGHTNING_ROD = auto()
+    LIGHT_SCREEN = auto()
     LIMBER = auto()
     LIQUID_OOZE = auto()
     LOCKED_MOVE = auto()
@@ -124,8 +128,10 @@ class Effect(Enum):
     MIRACLE_EYE = auto()
     MIST = auto()
     MISTY_TERRAIN = auto()
+    MUD_SPORT = auto()
     MUMMY = auto()
     MUST_RECHARGE = auto()
+    MYSTERY_BERRY = auto()
     NEUTRALIZING_GAS = auto()
     NIGHTMARE = auto()
     NO_RETREAT = auto()
@@ -169,6 +175,7 @@ class Effect(Enum):
     QUICK_GUARD = auto()
     RAGE = auto()
     RAGE_POWDER = auto()
+    RAMPAGE = auto()
     REFLECT = auto()
     RIPEN = auto()
     ROOST = auto()
@@ -257,6 +264,8 @@ class Effect(Enum):
 
         if message == "FALLENUNDEFINED":
             message = "FALLEN"
+        if message == "LIGHTSCREEN":
+            message = "LIGHT_SCREEN"
 
         try:
             return Effect[message]

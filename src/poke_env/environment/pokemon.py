@@ -792,8 +792,8 @@ class Pokemon:
         :rtype: float
         """
         if self.current_hp:
-            return self.current_hp / self.max_hp
-        return 0
+            return self.current_hp / float(self.max_hp)
+        return 0.0
 
     @property
     def effects(self) -> Dict[Effect, int]:
