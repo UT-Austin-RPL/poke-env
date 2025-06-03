@@ -39,6 +39,7 @@ class Pokemon:
         "_possible_abilities",
         "_preparing_move",
         "_preparing_target",
+        "_previous_move",
         "_protect_counter",
         "_shiny",
         "_stats",
@@ -109,6 +110,7 @@ class Pokemon:
         self._must_recharge: bool = False
         self._preparing_move: Optional[Move] = None
         self._preparing_target: Optional[bool | Pokemon] = None
+        self._previous_move: Optional[Move] = None
         self._protect_counter: int = 0
         self._revealed: bool = False
         self._stats: Dict[str, Optional[int]] = {
@@ -298,6 +300,7 @@ class Pokemon:
         self._preparing_move = None
         self._preparing_target = None
         move = self._add_move(move_id, use=use)
+        self._previous_move = move
 
         if move and move.is_protect_counter and not failed:
             self._protect_counter += 1
@@ -342,6 +345,10 @@ class Pokemon:
 
         self._preparing_move = move
         self._preparing_target = target
+
+    @property
+    def previous_move(self) -> Optional[Move]:
+        return self._previous_move
 
     def primal(self):
         species_id_str = to_id_str(self._species)
