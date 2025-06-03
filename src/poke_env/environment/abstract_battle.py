@@ -787,6 +787,8 @@ class AbstractBattle(ABC):
             source, target, stats = event[2:5]
             source_mon = self.get_pokemon(source)
             target_mon = self.get_pokemon(target)
+            # JAKE: I have a manual patch for guardswap in the metamon version.
+            # TODO: check guardswap.
             for stat in stats.split(", "):
                 source_mon.boosts[stat], target_mon.boosts[stat] = (
                     target_mon.boosts[stat],
@@ -930,7 +932,7 @@ class AbstractBattle(ABC):
         else:
             conditions = self.opponent_side_conditions
         condition = SideCondition.from_showdown_message(condition_str)
-        if condition is not SideCondition.UNKNOWN:
+        if condition is not SideCondition.UNKNOWN and condition in conditions:
             conditions.pop(condition)
 
     def _side_start(self, side: str, condition_str: str):
