@@ -303,6 +303,7 @@ class Pokemon:
         self._preparing_target = None
         move = self._add_move(move_id, use=use)
         self._previous_move = move
+        self._first_turn = False
 
         if move and move.is_protect_counter and not failed:
             self._protect_counter += 1
