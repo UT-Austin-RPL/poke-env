@@ -430,10 +430,17 @@ class AbstractBattle(ABC):
 
             if event[-1].replace(" ", "") in {
                 "[from]lockedmove",
-                "[from]Pursuit",
                 "[zeffect]",
+                "[from]Pursuit",
             }:
                 event = event[:-1]
+
+            if event[-1].startswith("[from]"):
+                # early gen partial trapping spam, for example:
+                # '', 'move', 'p1a: Tangela', 'Bind', 'p2a: Snorlax', '[from]Bind
+                maybe_from_move = event[-1][6:]
+                if maybe_from_move == event[3]:
+                    event = event[:-1]
 
             if event[-1].startswith("[anim]"):
                 event = event[:-1]
@@ -737,7 +744,7 @@ class AbstractBattle(ABC):
             target_mon = self.get_pokemon(target)
             if "[from]" in stats:
                 if "guardswap" in stats:
-                    # JAKE: need to use metamon to check if this ever triggers
+                    # JAKE: need to use metamon to check if this still ever triggers
                     all_stats = ["def", "spd"]
                 else:
                     all_stats = [
