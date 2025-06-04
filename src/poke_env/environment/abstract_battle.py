@@ -472,7 +472,7 @@ class AbstractBattle(ABC):
             # in early gen battles. All changes to `parse_message` are risky.
             # ugly _ variable names mark logic added by metamon's replay parser.
 
-            _poke_str, move = event[2], event[3]
+            _poke_str, move = event[2], event[3].strip()
             pokemon = self.get_pokemon(_poke_str)
             reveal_other_move = None
             _extra_from_message = None
@@ -571,7 +571,7 @@ class AbstractBattle(ABC):
                             )
 
             # Check if a silent-effect move has occurred (Minimize) and add the effect
-            if move.upper().strip() == "MINIMIZE":
+            if move.upper() == "MINIMIZE":
                 pokemon.start_effect("MINIMIZE")
             
             if reveal_other_move:
