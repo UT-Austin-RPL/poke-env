@@ -350,6 +350,18 @@ class OpenAIGymEnv(
             return obs, 0.0, False, False, info
         if self.current_battle.finished:
             raise RuntimeError("Battle is already finished, call reset")
+        # This deepcopy was removed (412254) because it was a major slowdown (#451),
+        # and this led to a series of changes that made reward functions much harder to write.
+        # With no deepcopy, the last_battle was the same as the current_battle, so the
+        # r(last_battle, current_battle) broke (#662). ---> the reward function was
+        # changed to r(current_battle)(#671). ---> there was no way to write rews as
+        # the diff between two turns (e.g., net change in health). ---> a rew buffer
+        # was added to track the scalar reward from previous turns. ---> Now the rew
+        # funcs have hidden state, which is bad, and it's much easier to write rews with
+        # some terms that are net diffs than to write ones where taking the diff of the
+        # output value does what you want.
+        #
+        # --> roll back all of that, and make the deepcopy fast.
         battle = copy.deepcopy(self.current_battle)
         battle.logger = None
         self.last_battle = battle
