@@ -246,6 +246,14 @@ class Effect(Enum):
         return f"{self.name} (effect) object"
 
     @staticmethod
+    def _manual_message_corrections(message: str) -> str:
+        if message == "FALLENUNDEFINED":
+            return "FALLEN"
+        elif message == "LIGHTSCREEN":
+            return "LIGHT_SCREEN"
+        return message
+
+    @staticmethod
     def from_showdown_message(message: str) -> Effect:
         """Returns the Effect object corresponding to the message.
 
@@ -260,11 +268,7 @@ class Effect(Enum):
         message = message.replace(" ", "_")
         message = message.replace("-", "_")
         message = message.upper()
-
-        if message == "FALLENUNDEFINED":
-            message = "FALLEN"
-        if message == "LIGHTSCREEN":
-            message = "LIGHT_SCREEN"
+        message = Effect._manual_message_corrections(message)
 
         try:
             return Effect[message]
@@ -291,6 +295,8 @@ class Effect(Enum):
         message = message.replace(" ", "")
         message = message.replace("-", "")
         message = message.upper()
+        message = Effect._manual_message_corrections(message)
+
         try:
             return _FROM_DATA[message]
         except KeyError:
