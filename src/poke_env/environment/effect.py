@@ -278,7 +278,7 @@ class Effect(Enum):
             for effect in Effect:
                 if effect.name.replace("_", "") == message:
                     return effect
-            # if we get here, we didn't find a match
+        # if we get here, we didn't find a match
         logging.getLogger("poke-env").warning(
             "Unexpected effect '%s' received. Effect.UNKNOWN will be used instead. "
             "If this is unexpected, please open an issue at "

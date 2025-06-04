@@ -65,6 +65,44 @@ class SpecialParserCategories:
     ITEM_NAMED_STOLEN = {"Thief", "Covet"}
 
 
+def _parse_move_from_extra(raw: str) -> str:
+    move = re.sub(f"\[from\]\s?move:\s?", "", raw).strip()
+    return move
+
+
+def _parse_mon_from_extra(raw: str) -> str:
+    mon = re.sub(f"\[of\]\s?", "", raw).strip()
+    return mon
+
+
+def _parse_ability_from_extra(raw: str) -> str:
+    ability = re.sub(f"\[from\]\s?ability:\s?", "", raw).strip()
+    return ability
+
+
+def _parse_item_from_extra(raw: str) -> str:
+    item = re.sub(f"\[from\]\s?item:\s?", "", raw).strip()
+    return item
+
+
+def parse_from_effect_of(event: list[str]) -> tuple[Optional[str]]:
+    """
+    for the misc. "[from] item/ability/move [of] id: pokemon" messages
+    """
+    item, ability, move, of_pokemon = None, None, None, None
+    for arg in event:
+        if "[from]" in arg:
+            if "item" in arg:
+                item = _parse_item_from_extra(arg)
+            if "ability" in arg:
+                ability = _parse_ability_from_extra(arg)
+            if "move" in arg:
+                move = _parse_move_from_extra(arg)
+        if "[of]" in arg:
+            of_pokemon = _parse_mon_from_extra(arg)
+    return item, ability, move, of_pokemon
+
+
 class AbstractBattle(ABC):
     MESSAGES_TO_IGNORE = {
         "-anim",
@@ -489,20 +527,14 @@ class AbstractBattle(ABC):
             for _e in reversed(event):
                 if "[from]" in _e:
                     if _e.replace(" ", "") not in {"[from]lockedmove", "[from]Pursuit"}:
-                        _extra_from_message = _e
+                        _extra_from_message = _e.replace("[from] ", "[from]")
                         break
             
             if _extra_from_message:
                 # be overly repetitive by splitting this logic into two clear branches:
-                # 1. messages that correctly specify whether they are revealing info about a move or ability
-                #    (i.e. "[from]move: Sleep Talk")
-                # 2. messages that do *not* specify what type of info they are revealing
-                #    (i.e. "[from]Sleep Talk")
-                # when I wrote the metamon version I was convinced #2 is from old replay files because
-                # #1 is a clear improvement. Now in poke-env on 2025 Showdown, #2 is still present.
-                # Must be an early gen difference?
-                _extra_from_message.replace("[from] ", "[from]") # cut occasional whitespace
                 if "[from]move:" in _extra_from_message or "[from]ability:" in _extra_from_message:
+                    # 1. messages that correctly specify whether they are revealing info about a move or ability
+                    #    (i.e. "[from]move: Sleep Talk")
                     _is_move = "[from]move:" in _extra_from_message
                     _is_ability = "[from]ability:" in _extra_from_message
                     if _is_move:
@@ -536,6 +568,8 @@ class AbstractBattle(ABC):
                                 self.turn,
                             )
                 else:
+                    # 2. messages that do *not* specify what type of info they are revealing
+                    #    (i.e. "[from]Sleep Talk")
                     if self.logger is not None and self._gen > 4:
                         self.logger.warning(
                             "Battle message %s in battle %s turn %d activates ambiguous '[from]move/ability' logic. "
@@ -606,8 +640,24 @@ class AbstractBattle(ABC):
             self.get_pokemon(pokemon).boost(stat, -int(amount))
         elif event[1] == "-ability":
             pokemon, cause = event[2:4]
-            if len(event) > 4 and event[4].startswith("[from] move:"):
-                self.get_pokemon(pokemon).set_temporary_ability(cause)
+            found_item, found_ability, found_move, found_mon = parse_from_effect_of(
+                event
+            )
+            if found_mon and found_ability:
+                if found_ability in SpecialParserCategories.ABILITY_STEALS_ABILITY:
+                    # ['p1a: Porygon2', 'Clear Body', '[from] ability: Trace', '[of] p2a: Dragapult']
+                    # Porygon2 has the Trace ability, copying Clear Body from Dragapult
+                    self.get_pokemon(pokemon).ability = (
+                        found_ability  # porygon has trace
+                    )
+                    self.get_pokemon(pokemon).set_temporary_ability(
+                        cause
+                    )  # but currently has clear body
+                    self.get_pokemon(found_mon).ability = (
+                        cause  # dragapult has clear body
+                    )
+            elif found_ability:
+                self.get_pokemon(pokemon).set_temporary_ability(found_ability)
             else:
                 self.get_pokemon(pokemon).ability = cause
         elif split_message[1] == "-start":
