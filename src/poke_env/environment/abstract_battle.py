@@ -9,6 +9,7 @@ from poke_env.data.replay_template import REPLAY_TEMPLATE
 from poke_env.environment.move import Move
 from poke_env.environment.field import Field
 from poke_env.environment.pokemon import Pokemon
+from poke_env.environment.effect import Effect
 from poke_env.environment.side_condition import STACKABLE_CONDITIONS, SideCondition
 from poke_env.environment.weather import Weather
 
@@ -658,12 +659,29 @@ class AbstractBattle(ABC):
             if effect.startswith("ability: "):
                 ability = effect[9:]
                 self.get_pokemon(target).ability = ability
-            elif target and effect == "move: Skill Swap":
-                self.get_pokemon(target).start_effect(effect, event[4:6])
+                return
+            effect = Effect.from_showdown_message(effect)
+            # found_item, found_ability, found_move, found_mon = _parse_from_effect_of(
+            #    event
+            # )
+            if effect == Effect.TRICK:
+                # JAKE: do we need to handle tricks in poke-env
+                pass
+            elif effect == Effect.MIMIC:
+                # JAKE: do we need to handle mimics in poke-env?
+                pass
+            elif effect in [Effect.LEPPA_BERRY, Effect.MYSTERY_BERRY]:
+                # JAKE: no pp changes needed in poke-env?
+                pass
+            elif effect == Effect.SKILL_SWAP:
+                # only special case that was originally here
+                self.get_pokemon(target).start_effect(
+                    from_effect=effect, details=event[4:6]
+                )
                 actor = event[6].replace("[of] ", "")
                 self.get_pokemon(actor).set_temporary_ability(event[5])
-            else:
-                self.get_pokemon(target).start_effect(effect)
+            if target != "":
+                self.get_pokemon(target).start_effect(from_effect=effect)
         elif event[1] == "-status":
             pokemon, status = event[2:4]
             self.get_pokemon(pokemon).status = status  # type: ignore

@@ -398,8 +398,18 @@ class Pokemon:
         else:
             self._temporary_ability = _NO_ABILITY
 
-    def start_effect(self, effect_str: str, details: Optional[Any] = None):
-        effect = Effect.from_showdown_message(effect_str)
+    def start_effect(
+        self,
+        from_str: Optional[str] = None,
+        details: Optional[Any] = None,
+        from_effect: Optional[Effect] = None,
+    ):
+        if from_effect is None and from_str is not None:
+            effect = Effect.from_showdown_message(from_str)
+        elif from_str is None and from_effect is not None:
+            effect = from_effect
+        else:
+            raise ValueError("Either from_str or from_effect must be provided")
         if effect not in self._effects:
             self._effects[effect] = 0
         elif effect.is_action_countable:
