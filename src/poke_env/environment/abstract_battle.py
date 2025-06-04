@@ -6,10 +6,63 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from poke_env.data import GenData, to_id_str
 from poke_env.data.replay_template import REPLAY_TEMPLATE
+from poke_env.environment.move import Move
 from poke_env.environment.field import Field
 from poke_env.environment.pokemon import Pokemon
 from poke_env.environment.side_condition import STACKABLE_CONDITIONS, SideCondition
 from poke_env.environment.weather import Weather
+
+
+class SpecialParserCategories:
+    # https://bulbapedia.bulbagarden.net/wiki/Category:Moves_that_switch_the_user_out
+    MOVES_THAT_SWITCH_THE_USER_OUT = {
+        "Baton Pass",
+        "Chilly Reception",
+        "Flip Turn",
+        "Parting Shot",
+        "Shed Tail",
+        "Teleport",
+        "U-turn",
+        "Volt Switch",
+    }
+
+    # https://bulbapedia.bulbagarden.net/wiki/Category:Moves_that_call_other_moves
+    MOVE_OVERRIDE = {
+        "Metronome",
+        "Me First",
+        "Copycat",
+        "Nature Power",
+        "Magic Coat",
+        "Mirror Move",
+        "Assist",
+        "Snatch",
+    }
+    MOVE_OVERRIDE_BUT_REVEAL_ANYWAY = {"Sleep Talk"}
+    MOVE_IGNORE_ITEMS = {"Custap Berry"}
+    CONSECUTIVE_MOVES = {
+        "Rollout",
+        "Outrage",
+        "Thrash",
+        "Uproar",
+        "Petal Dance",
+        "Ice Ball",
+    }
+
+    GEN1_PP_ROLLOVERS = {"Bind", "Wrap", "Fire Spin", "Clamp"}
+
+    PLEDGES = {"Grass Pledge", "Water Pledge", "Fire Pledge"}
+
+    # https://bulbapedia.bulbagarden.net/wiki/Category:Moves_that_restore_HP
+    RESTORES_PP = {"Lunar Dance"}
+    RESTORES_STATUS = {"Healing Wish", "Lunar Dance"}
+
+    ABILITY_STEALS_ABILITY = {"Trace"}
+
+    # https://bulbapedia.bulbagarden.net/wiki/Category:Item-manipulating_moves
+    # we are missing some of these; lookout for UnhandledFromMoveItemLogic
+    ITEM_APPROVED_SKIP = {"Knock Off", "Recycle", "Fling", "Corrosive Gas"}
+    ITEM_UNNAMED_STOLEN = {"Trick", "Switcheroo"}
+    ITEM_NAMED_STOLEN = {"Thief", "Covet"}
 
 
 class AbstractBattle(ABC):
@@ -404,7 +457,7 @@ class AbstractBattle(ABC):
 
         if event[1] in self.MESSAGES_TO_IGNORE:
             return
-        elif event[1] in ["drag", "switch"]:
+        elif event[1] == "drag" or event[1] == "switch":
             pokemon, details, hp_status = event[2:5]
             self.switch(pokemon, details, hp_status)
         elif event[1] == "-damage":
@@ -413,133 +466,118 @@ class AbstractBattle(ABC):
             self._check_damage_message_for_item(event)
             self._check_damage_message_for_ability(event)
         elif event[1] == "move":
-            failed = False
-            override_move = None
-            reveal_other_move = False
+            # fmt: off
+            # JAKE: attempt to modify to match Metamon's version &
+            # support unhandled [from]move/ability messages that appear
+            # in early gen battles. All changes to `parse_message` are risky.
+            # ugly _ variable names mark logic added by metamon's replay parser.
 
+            _poke_str, move = event[2], event[3]
+            pokemon = self.get_pokemon(_poke_str)
+            reveal_other_move = None
+            _extra_from_message = None
+
+            # check if the move failed
+            failed = False
             for move_failed_suffix in ["[miss]", "[still]", "[notarget]"]:
                 if event[-1] == move_failed_suffix:
                     event = event[:-1]
                     failed = True
-
-            if event[-1] == "[notarget]":
-                event = event[:-1]
-
-            if event[-1].startswith("[spread]"):
-                event = event[:-1]
-
-            if event[-1].replace(" ", "") in {
-                "[from]lockedmove",
-                "[zeffect]",
-                "[from]Pursuit",
-            }:
-                event = event[:-1]
-
-            if event[-1].startswith("[from]"):
-                # early gen partial trapping spam, for example:
-                # '', 'move', 'p1a: Tangela', 'Bind', 'p2a: Snorlax', '[from]Bind
-                maybe_from_move = event[-1][6:]
-                if maybe_from_move == event[3]:
-                    event = event[:-1]
-
-            if event[-1].startswith("[anim]"):
-                event = event[:-1]
-
-            if event[-1].startswith("[from]move: "):
-                override_move = event.pop()[12:]
-
-                if override_move == "Sleep Talk":
-                    # Sleep talk was used, but also reveals another move
-                    reveal_other_move = True
-                elif override_move in {"Copycat", "Metronome", "Nature Power"}:
-                    pass
-                elif override_move in {"Grass Pledge", "Water Pledge", "Fire Pledge"}:
-                    override_move = None
-                elif self.logger is not None:
-                    self.logger.warning(
-                        "Unmanaged [from]move message received - move %s in cleaned up "
-                        "message %s in battle %s turn %d",
-                        override_move,
-                        event,
-                        self.battle_tag,
-                        self.turn,
-                    )
-
-            if event[-1] == "null":
-                event = event[:-1]
-
-            if event[-1].startswith("[from]ability: "):
-                revealed_ability = event.pop()[15:]
-                pokemon = event[2]
-                self.get_pokemon(pokemon).ability = revealed_ability
-
-                if revealed_ability == "Magic Bounce":
-                    return
-                elif revealed_ability == "Dancer":
-                    return
-                elif self.logger is not None:
-                    self.logger.warning(
-                        "Unmanaged [from]ability: message received - ability %s in "
-                        "cleaned up message %s in battle %s turn %d",
-                        revealed_ability,
-                        event,
-                        self.battle_tag,
-                        self.turn,
-                    )
-            if event[-1] == "[from]Magic Coat":
-                return
-
-            while event[-1] == "[still]":
-                event = event[:-1]
-
-            if event[-1] == "":
-                event = event[:-1]
-
-            if len(event) == 4:
-                pokemon, move = event[2:4]
-            elif len(event) == 5:
-                pokemon, move, presumed_target = event[2:5]
-
-                if len(presumed_target) > 4 and presumed_target[:4] in {
-                    "p1: ",
-                    "p2: ",
-                    "p1a:",
-                    "p1b:",
-                    "p2a:",
-                    "p2b:",
-                }:
-                    pass
-                elif self.logger is not None:
-                    self.logger.warning(
-                        "Unmanaged move message format received - cleaned up message %s"
-                        " in battle %s turn %d",
-                        event,
-                        self.battle_tag,
-                        self.turn,
-                    )
-            else:
-                pokemon, move, presumed_target = event[2:5]
-                if self.logger is not None:
-                    self.logger.warning(
-                        "Unmanaged move message format received - cleaned up message %s in "
-                        "battle %s turn %d",
-                        event,
-                        self.battle_tag,
-                        self.turn,
-                    )
+            
+            # remove all the existing clutter of stripping away extra messages; 
+            # there is only one type of message that has any new info to consider.
+            for _e in reversed(event):
+                if "[from]" in _e:
+                    if _e.replace(" ", "") not in {"[from]lockedmove", "[from]Pursuit"}:
+                        _extra_from_message = _e
+                        break
+            
+            if _extra_from_message:
+                # be overly repetitive by splitting this logic into two clear branches:
+                # 1. messages that correctly specify whether they are revealing info about a move or ability
+                #    (i.e. "[from]move: Sleep Talk")
+                # 2. messages that do *not* specify what type of info they are revealing
+                #    (i.e. "[from]Sleep Talk")
+                # when I wrote the metamon version I was convinced #2 is from old replay files because
+                # #1 is a clear improvement. Now in poke-env on 2025 Showdown, #2 is still present.
+                # Must be an early gen difference?
+                _extra_from_message.replace("[from] ", "[from]") # cut occasional whitespace
+                if "[from]move:" in _extra_from_message or "[from]ability:" in _extra_from_message:
+                    _is_move = "[from]move:" in _extra_from_message
+                    _is_ability = "[from]ability:" in _extra_from_message
+                    if _is_move:
+                        _from_move = _extra_from_message.split("[from]move:")[-1].strip()
+                        if _from_move in SpecialParserCategories.MOVE_OVERRIDE_BUT_REVEAL_ANYWAY:
+                            reveal_other_move = move
+                            move = _from_move
+                        elif _from_move in SpecialParserCategories.MOVE_OVERRIDE:
+                            pass
+                        elif _from_move in SpecialParserCategories.PLEDGES:
+                            pass
+                        elif self.logger is not None:
+                            self.logger.warning(
+                                "Unmanaged [from]move: message received - move %s in "
+                                "cleaned up message %s in battle %s turn %d",
+                                _from_move,
+                                event,
+                                self.battle_tag,
+                                self.turn,
+                            )
+                    elif _is_ability:
+                        revealed_ability = _extra_from_message.split("[from]ability:")[-1].strip()
+                        pokemon.ability = revealed_ability
+                        if revealed_ability not in {"Magic Bounce", "Dancer"} and self.logger is not None:
+                            self.logger.warning(
+                                "Unmanaged [from]ability: message received - ability %s in "
+                                "cleaned up message %s in battle %s turn %d",
+                                revealed_ability,
+                                event,
+                                self.battle_tag,
+                                self.turn,
+                            )
+                else:
+                    if self.logger is not None and self._gen > 4:
+                        self.logger.warning(
+                            "Battle message %s in battle %s turn %d activates ambiguous '[from]move/ability' logic. "
+                            "Changes to AbstractBattle.parse_message may be needed if this "
+                            "message appears outside of Gen 1-4.",
+                            event,
+                            self.battle_tag,
+                            self.turn,
+                        )
+                    _ability_or_move = _extra_from_message.split("[from]")[-1].strip()
+                    # ths most common reason to hit this branch is partial trapping spam,
+                    # i.e. 'p1a Clamp ... [from]Clamp'. In which case Clamp would already be revealed
+                    # and there's nothing more to do.
+                    _probably_repeat_move = _ability_or_move.lower() == move.lower()
+                    _probably_item = _ability_or_move in ({pokemon.item} | SpecialParserCategories.MOVE_IGNORE_ITEMS)
+                    if not (_probably_repeat_move or _probably_item):
+                        if _ability_or_move in SpecialParserCategories.MOVE_OVERRIDE_BUT_REVEAL_ANYWAY:
+                            # i.e. we actually used Sleep Talk, but `move` is another move in the set
+                            reveal_other_move = move
+                            move = _ability_or_move
+                        elif _ability_or_move in SpecialParserCategories.MOVE_OVERRIDE:
+                            pass
+                        elif _ability_or_move in SpecialParserCategories.PLEDGES:
+                            pass
+                        elif self.logger is not None:
+                            self.logger.warning(
+                                "Unmanaged [from] message received - move %s in "
+                                "cleaned up message %s in battle %s turn %d",
+                                _ability_or_move,
+                                event,
+                                self.battle_tag,
+                                self.turn,
+                            )
 
             # Check if a silent-effect move has occurred (Minimize) and add the effect
             if move.upper().strip() == "MINIMIZE":
-                temp_pokemon = self.get_pokemon(pokemon)
-                temp_pokemon.start_effect("MINIMIZE")
-
-            if override_move:
-                # Moves that can trigger this branch results in two `move` messages being sent.
-                # We're setting use=False in the one (with the override) in order to prevent two pps from being used
-                # incorrectly.
-                self.get_pokemon(pokemon).moved(override_move, failed=failed, use=False)
-            if override_move is None or reveal_other_move:
-                self.get_pokemon(pokemon).moved(move, failed=failed, use=False)
+                pokemon.start_effect("MINIMIZE")
+            
+            if reveal_other_move:
+                pokemon.moved(reveal_other_move, failed=failed, use=False)
+            pokemon.moved(move, failed=failed, use=False)
+            # fmt: on
         elif event[1] == "cant":
             pokemon, _ = event[2:4]
             self.get_pokemon(pokemon).cant_move()
