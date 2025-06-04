@@ -273,14 +273,20 @@ class Effect(Enum):
         try:
             return Effect[message]
         except KeyError:
-            logging.getLogger("poke-env").warning(
-                "Unexpected effect '%s' received. Effect.UNKNOWN will be used instead. "
-                "If this is unexpected, please open an issue at "
-                "https://github.com/hsahovic/poke-env/issues/ along with this error "
-                "message and a description of your program.",
-                message,
-            )
-            return Effect.UNKNOWN
+            # catch inconsistent use of whitespace both within Showdown protocol
+            # and between sim protocol and static data
+            for effect in Effect:
+                if effect.name.replace("_", "") == message:
+                    return effect
+            # if we get here, we didn't find a match
+        logging.getLogger("poke-env").warning(
+            "Unexpected effect '%s' received. Effect.UNKNOWN will be used instead. "
+            "If this is unexpected, please open an issue at "
+            "https://github.com/hsahovic/poke-env/issues/ along with this error "
+            "message and a description of your program.",
+            message,
+        )
+        return Effect.UNKNOWN
 
     @staticmethod
     def from_data(message: str) -> Effect:
@@ -291,23 +297,9 @@ class Effect(Enum):
         :return: The corresponding Effect object.
         :rtype: Effect
         """
-        message = message.replace("_", "")
-        message = message.replace(" ", "")
-        message = message.replace("-", "")
-        message = message.upper()
-        message = Effect._manual_message_corrections(message)
-
-        try:
-            return _FROM_DATA[message]
-        except KeyError:
-            logging.getLogger("poke-env").warning(
-                "Unexpected effect '%s' received. Effect.UNKNOWN will be used instead. "
-                "If this is unexpected, please open an issue at "
-                "https://github.com/hsahovic/poke-env/issues/ along with this error "
-                "message and a description of your program.",
-                message,
-            )
-            return Effect.UNKNOWN
+        # JAKE: this should no longer be necessary, but leave the door open for
+        # one-off changes specific to how the effects are stored in static data
+        return Effect.from_showdown_message(message)
 
     @property
     def breaks_protect(self):
@@ -785,227 +777,3 @@ _ENDS_ON_TURN_EFFECTS = {
 }
 
 _ACTION_COUNTER_EFFECTS: Set[Effect] = {Effect.RAGE, Effect.STOCKPILE}
-
-_FROM_DATA: Dict[str, Effect] = {
-    "UNKNOWN": Effect.UNKNOWN,
-    "AFTERYOU": Effect.AFTER_YOU,
-    "AFTERMATH": Effect.AFTERMATH,
-    "AQUARING": Effect.AQUA_RING,
-    "AROMATHERAPY": Effect.AROMATHERAPY,
-    "AROMAVEIL": Effect.AROMA_VEIL,
-    "ATTRACT": Effect.ATTRACT,
-    "AUTOTOMIZE": Effect.AUTOTOMIZE,
-    "BADDREAMS": Effect.BAD_DREAMS,
-    "BANEFULBUNKER": Effect.BANEFUL_BUNKER,
-    "BATTLEBOND": Effect.BATTLE_BOND,
-    "BIDE": Effect.BIDE,
-    "BIND": Effect.BIND,
-    "BURNINGBULWARK": Effect.BURNING_BULWARK,
-    "BURNUP": Effect.BURN_UP,
-    "CELEBRATE": Effect.CELEBRATE,
-    "CHARGE": Effect.CHARGE,
-    "CLAMP": Effect.CLAMP,
-    "COMMANDER": Effect.COMMANDER,
-    "CONFUSION": Effect.CONFUSION,
-    "COURTCHANGE": Effect.COURT_CHANGE,
-    "CRAFTYSHIELD": Effect.CRAFTY_SHIELD,
-    "CUDCHEW": Effect.CUD_CHEW,
-    "CURSE": Effect.CURSE,
-    "CUSTAPBERRY": Effect.CUSTAP_BERRY,
-    "DANCER": Effect.DANCER,
-    "DEFENSECURL": Effect.DEFENSE_CURL,
-    "DESTINYBOND": Effect.DESTINY_BOND,
-    "DISABLE": Effect.DISABLE,
-    "DISGUISE": Effect.DISGUISE,
-    "DOOMDESIRE": Effect.DOOM_DESIRE,
-    "DRAGONCHEER": Effect.DRAGON_CHEER,
-    "DYNAMAX": Effect.DYNAMAX,
-    "EERIESPELL": Effect.EERIE_SPELL,
-    "ELECTRICTERRAIN": Effect.ELECTRIC_TERRAIN,
-    "ELECTRIFY": Effect.ELECTRIFY,
-    "EMBARGO": Effect.EMBARGO,
-    "EMERGENCYEXIT": Effect.EMERGENCY_EXIT,
-    "ENCORE": Effect.ENCORE,
-    "ENDURE": Effect.ENDURE,
-    "FALLEN": Effect.FALLEN,
-    "FALLEN1": Effect.FALLEN1,
-    "FALLEN2": Effect.FALLEN2,
-    "FALLEN3": Effect.FALLEN3,
-    "FALLEN4": Effect.FALLEN4,
-    "FALLEN5": Effect.FALLEN5,
-    "FAIRYLOCK": Effect.FAIRY_LOCK,
-    "FEINT": Effect.FEINT,
-    "FICKLEBEAM": Effect.FICKLE_BEAM,
-    "FIRESPIN": Effect.FIRE_SPIN,
-    "FLASHFIRE": Effect.FLASH_FIRE,
-    "FLINCH": Effect.FLINCH,
-    "FLOWERVEIL": Effect.FLOWER_VEIL,
-    "FOCUSBAND": Effect.FOCUS_BAND,
-    "FOCUSENERGY": Effect.FOCUS_ENERGY,
-    "FOLLOWME": Effect.FOLLOW_ME,
-    "FORESIGHT": Effect.FORESIGHT,
-    "FOREWARN": Effect.FOREWARN,
-    "FUTURESIGHT": Effect.FUTURE_SIGHT,
-    "GASTROACID": Effect.GASTRO_ACID,
-    "GLAIVERUSH": Effect.GLAIVE_RUSH,
-    "GRAVITY": Effect.GRAVITY,
-    "GRUDGE": Effect.GRUDGE,
-    "GUARDSPLIT": Effect.GUARD_SPLIT,
-    "GULPMISSILE": Effect.GULP_MISSILE,
-    "GMAXCENTIFERNO": Effect.G_MAX_CENTIFERNO,
-    "GMAXCHISTRIKE": Effect.G_MAX_CHI_STRIKE,
-    "GMAXONEBLOW": Effect.G_MAX_ONE_BLOW,
-    "GMAXRAPIDFLOW": Effect.G_MAX_RAPID_FLOW,
-    "GMAXSANDBLAST": Effect.G_MAX_SANDBLAST,
-    "HADRONENGINE": Effect.HADRON_ENGINE,
-    "HEALBELL": Effect.HEAL_BELL,
-    "HEALBLOCK": Effect.HEAL_BLOCK,
-    "HEALER": Effect.HEALER,
-    "HELPINGHAND": Effect.HELPING_HAND,
-    "HYDRATION": Effect.HYDRATION,
-    "HYPERSPACEFURY": Effect.HYPERSPACE_FURY,
-    "HYPERSPACEHOLE": Effect.HYPERSPACE_HOLE,
-    "ICEFACE": Effect.ICE_FACE,
-    "ILLUSION": Effect.ILLUSION,
-    "IMMUNITY": Effect.IMMUNITY,
-    "IMPRISON": Effect.IMPRISON,
-    "INFESTATION": Effect.INFESTATION,
-    "INGRAIN": Effect.INGRAIN,
-    "INNARDSOUT": Effect.INNARDS_OUT,
-    "INSTRUCT": Effect.INSTRUCT,
-    "INSOMNIA": Effect.INSOMNIA,
-    "IRONBARBS": Effect.IRON_BARBS,
-    "KINGSSHIELD": Effect.KINGS_SHIELD,
-    "LASERFOCUS": Effect.LASER_FOCUS,
-    "LEECHSEED": Effect.LEECH_SEED,
-    "LEPPABERRY": Effect.LEPPA_BERRY,
-    "LIGHTNINGROD": Effect.LIGHTNING_ROD,
-    "LIMBER": Effect.LIMBER,
-    "LIQUIDOOZE": Effect.LIQUID_OOZE,
-    "LOCKEDMOVE": Effect.LOCKED_MOVE,
-    "LOCKON": Effect.LOCK_ON,
-    "MAGICCOAT": Effect.MAGIC_COAT,
-    "MAGMASTORM": Effect.MAGMA_STORM,
-    "MAGNETRISE": Effect.MAGNET_RISE,
-    "MAGNITUDE": Effect.MAGNITUDE,
-    "MATBLOCK": Effect.MAT_BLOCK,
-    "MAXGUARD": Effect.MAX_GUARD,
-    "MIMIC": Effect.MIMIC,
-    "MIMICRY": Effect.MIMICRY,
-    "MINDREADER": Effect.MIND_READER,
-    "MINIMIZE": Effect.MINIMIZE,
-    "MIRACLEEYE": Effect.MIRACLE_EYE,
-    "MIST": Effect.MIST,
-    "MISTYTERRAIN": Effect.MISTY_TERRAIN,
-    "MUMMY": Effect.MUMMY,
-    "MUSTRECHARGE": Effect.MUST_RECHARGE,
-    "NEUTRALIZINGGAS": Effect.NEUTRALIZING_GAS,
-    "NIGHTMARE": Effect.NIGHTMARE,
-    "NORETREAT": Effect.NO_RETREAT,
-    "OBLIVIOUS": Effect.OBLIVIOUS,
-    "OBSTRUCT": Effect.OBSTRUCT,
-    "OCTOLOCK": Effect.OCTOLOCK,
-    "ORICHALCUMPULSE": Effect.ORICHALCUM_PULSE,
-    "OWNTEMPO": Effect.OWN_TEMPO,
-    "PARTIALLYTRAPPED": Effect.PARTIALLY_TRAPPED,
-    "PASTELVEIL": Effect.PASTEL_VEIL,
-    "PERISH0": Effect.PERISH0,
-    "PERISH1": Effect.PERISH1,
-    "PERISH2": Effect.PERISH2,
-    "PERISH3": Effect.PERISH3,
-    "PHANTOMFORCE": Effect.PHANTOM_FORCE,
-    "POLTERGEIST": Effect.POLTERGEIST,
-    "POWDER": Effect.POWDER,
-    "POWERCONSTRUCT": Effect.POWER_CONSTRUCT,
-    "POWERSHIFT": Effect.POWER_SHIFT,
-    "POWERSPLIT": Effect.POWER_SPLIT,
-    "POWERTRICK": Effect.POWER_TRICK,
-    "PROTECT": Effect.PROTECT,
-    "PROTECTIVEPADS": Effect.PROTECTIVE_PADS,
-    "PROTOSYNTHESIS": Effect.PROTOSYNTHESIS,
-    "PROTOSYNTHESISATK": Effect.PROTOSYNTHESISATK,
-    "PROTOSYNTHESISDEF": Effect.PROTOSYNTHESISDEF,
-    "PROTOSYNTHESISSPA": Effect.PROTOSYNTHESISSPA,
-    "PROTOSYNTHESISSPD": Effect.PROTOSYNTHESISSPD,
-    "PROTOSYNTHESISSPE": Effect.PROTOSYNTHESISSPE,
-    "PSYCHICTERRAIN": Effect.PSYCHIC_TERRAIN,
-    "PURSUIT": Effect.PURSUIT,
-    "QUARKDRIVE": Effect.QUARK_DRIVE,
-    "QUARKDRIVEATK": Effect.QUARKDRIVEATK,
-    "QUARKDRIVEDEF": Effect.QUARKDRIVEDEF,
-    "QUARKDRIVESPA": Effect.QUARKDRIVESPA,
-    "QUARKDRIVESPD": Effect.QUARKDRIVESPD,
-    "QUARKDRIVESPE": Effect.QUARKDRIVESPE,
-    "QUASH": Effect.QUASH,
-    "QUICKCLAW": Effect.QUICK_CLAW,
-    "QUICKDRAW": Effect.QUICK_DRAW,
-    "QUICKGUARD": Effect.QUICK_GUARD,
-    "RAGE": Effect.RAGE,
-    "RAGEPOWDER": Effect.RAGE_POWDER,
-    "REFLECT": Effect.REFLECT,
-    "RIPEN": Effect.RIPEN,
-    "ROOST": Effect.ROOST,
-    "ROUGHSKIN": Effect.ROUGH_SKIN,
-    "SAFEGUARD": Effect.SAFEGUARD,
-    "SAFETYGOGGLES": Effect.SAFETY_GOGGLES,
-    "SALTCURE": Effect.SALT_CURE,
-    "SANDTOMB": Effect.SAND_TOMB,
-    "SCREENCLEANER": Effect.SCREEN_CLEANER,
-    "SHADOWFORCE": Effect.SHADOW_FORCE,
-    "SHEDSKIN": Effect.SHED_SKIN,
-    "SILKTRAP": Effect.SILK_TRAP,
-    "SKETCH": Effect.SKETCH,
-    "SKILLSWAP": Effect.SKILL_SWAP,
-    "SKYDROP": Effect.SKY_DROP,
-    "SLOWSTART": Effect.SLOW_START,
-    "SMACKDOWN": Effect.SMACK_DOWN,
-    "SNAPTRAP": Effect.SNAP_TRAP,
-    "SNATCH": Effect.SNATCH,
-    "SPARKLINGARIA": Effect.SPARKLING_ARIA,
-    "SPEEDSWAP": Effect.SPEED_SWAP,
-    "SPIKYSHIELD": Effect.SPIKY_SHIELD,
-    "SPITE": Effect.SPITE,
-    "SPOTLIGHT": Effect.SPOTLIGHT,
-    "STICKY_HOLD": Effect.STICKY_HOLD,
-    "STICKY_WEB": Effect.STICKY_WEB,
-    "STOCKPILE": Effect.STOCKPILE,
-    "STOCKPILE1": Effect.STOCKPILE1,
-    "STOCKPILE2": Effect.STOCKPILE2,
-    "STOCKPILE3": Effect.STOCKPILE3,
-    "STORMDRAIN": Effect.STORM_DRAIN,
-    "STRUGGLE": Effect.STRUGGLE,
-    "SUBSTITUTE": Effect.SUBSTITUTE,
-    "SUCTIONCUPS": Effect.SUCTION_CUPS,
-    "SUPREMEOVERLORD": Effect.SUPREME_OVERLORD,
-    "SYRUPBOMB": Effect.SYRUP_BOMB,
-    "SWEETVEIL": Effect.SWEET_VEIL,
-    "SYMBIOSIS": Effect.SYMBIOSIS,
-    "SYNCHRONIZE": Effect.SYNCHRONIZE,
-    "TARSHOT": Effect.TAR_SHOT,
-    "TAUNT": Effect.TAUNT,
-    "TELEKINESIS": Effect.TELEKINESIS,
-    "TELEPATHY": Effect.TELEPATHY,
-    "TERASHELL": Effect.TERA_SHELL,
-    "TERASHIFT": Effect.TERA_SHIFT,
-    "TIDYUP": Effect.TIDY_UP,
-    "TOXICDEBRIS": Effect.TOXIC_DEBRIS,
-    "THERMALEXCHANGE": Effect.THERMAL_EXCHANGE,
-    "THROATCHOP": Effect.THROAT_CHOP,
-    "THUNDERCAGE": Effect.THUNDER_CAGE,
-    "TORMENT": Effect.TORMENT,
-    "TRAPPED": Effect.TRAPPED,
-    "TRICK": Effect.TRICK,
-    "TYPEADD": Effect.TYPEADD,
-    "TYPECHANGE": Effect.TYPECHANGE,
-    "UPROAR": Effect.UPROAR,
-    "VITALSPIRIT": Effect.VITAL_SPIRIT,
-    "WANDERINGSPIRIT": Effect.WANDERING_SPIRIT,
-    "WATERBUBBLE": Effect.WATER_BUBBLE,
-    "WATERVEIL": Effect.WATER_VEIL,
-    "WHIRLPOOL": Effect.WHIRLPOOL,
-    "WIDEGUARD": Effect.WIDE_GUARD,
-    "WIMPOUT": Effect.WIMP_OUT,
-    "WRAP": Effect.WRAP,
-    "YAWN": Effect.YAWN,
-    "ZERO_TO_HERO": Effect.ZERO_TO_HERO,
-}

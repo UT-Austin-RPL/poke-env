@@ -51,23 +51,23 @@ class SideCondition(Enum):
         message = message.replace("move: ", "")
         message = message.replace(" ", "_")
         message = message.replace("-", "_")
-        condition_code = message.upper()
+        message = message.upper()
         try:
-            return SideCondition[condition_code]
+            return SideCondition[message]
         except KeyError:
-            # hack attempt to catch conditions w/ inconsistent spacing (mainly in old replays)
-            # JAKE: recheck this on v0.8.3
+            # catch inconsistent use of whitespace both within Showdown protocol
+            # and between sim protocol and static data
             for known_condition in SideCondition:
-                if known_condition.name.replace("_", "") == condition_code:
+                if known_condition.name.replace("_", "") == message:
                     return known_condition
-            logging.getLogger("poke-env").warning(
-                "Unexpected side condition '%s' received. SideCondition.UNKNOWN will be"
-                " used instead. If this is unexpected, please open an issue at "
-                "https://github.com/hsahovic/poke-env/issues/ along with this error "
-                "message and a description of your program.",
-                message,
-            )
-            return SideCondition.UNKNOWN
+        logging.getLogger("poke-env").warning(
+            "Unexpected side condition '%s' received. SideCondition.UNKNOWN will be"
+            " used instead. If this is unexpected, please open an issue at "
+            "https://github.com/hsahovic/poke-env/issues/ along with this error "
+            "message and a description of your program.",
+            message,
+        )
+        return SideCondition.UNKNOWN
 
     @staticmethod
     def from_data(message: str):
@@ -78,50 +78,10 @@ class SideCondition(Enum):
         :return: The corresponding SideCondition object.
         :rtype: SideCondition
         """
-        message = message.replace("_", "")
-        message = message.replace(" ", "")
-        message = message.replace("-", "")
-        message = message.upper()
-
-        try:
-            return _FROM_DATA[message]
-        except KeyError:
-            logging.getLogger("poke-env").warning(
-                "Unexpected SideCondition '%s' received. SideCondition.UNKNOWN will be used "
-                "instead. If this is unexpected, please open an issue at "
-                "https://github.com/hsahovic/poke-env/issues/ along with this error "
-                "message and a description of your program.",
-                message,
-            )
-            return SideCondition.UNKNOWN
+        # JAKE: this should no longer be necessary, but leave the door open for
+        # one-off changes specific to how the side conditions are stored in static data
+        return SideCondition.from_showdown_message(message)
 
 
 # SideCondition -> Max useful stack level
 STACKABLE_CONDITIONS = {SideCondition.SPIKES: 3, SideCondition.TOXIC_SPIKES: 2}
-
-_FROM_DATA: Dict[str, SideCondition] = {
-    "UNKNOWN": SideCondition.UNKNOWN,
-    "AURORAVEIL": SideCondition.AURORA_VEIL,
-    "CRAFTYSHIELD": SideCondition.CRAFTY_SHIELD,
-    "FIREPLEDGE": SideCondition.FIRE_PLEDGE,
-    "GMAXCANNONADE": SideCondition.G_MAX_CANNONADE,
-    "GMAXSTEELSURGE": SideCondition.G_MAX_STEELSURGE,
-    "GMAXVINELASH": SideCondition.G_MAX_VINE_LASH,
-    "GMAXVOLCALITH": SideCondition.G_MAX_VOLCALITH,
-    "GMAXWILDFIRE": SideCondition.G_MAX_WILDFIRE,
-    "GRASSPLEDGE": SideCondition.GRASS_PLEDGE,
-    "LIGHTSCREEN": SideCondition.LIGHT_SCREEN,
-    "LUCKYCHANT": SideCondition.LUCKY_CHANT,
-    "MATBLOCK": SideCondition.MATBLOCK,
-    "MIST": SideCondition.MIST,
-    "QUICKGUARD": SideCondition.QUICK_GUARD,
-    "REFLECT": SideCondition.REFLECT,
-    "SAFEGUARD": SideCondition.SAFEGUARD,
-    "SPIKES": SideCondition.SPIKES,
-    "STEALTHROCK": SideCondition.STEALTH_ROCK,
-    "STICKYWEB": SideCondition.STICKY_WEB,
-    "TAILWIND": SideCondition.TAILWIND,
-    "TOXICSPIKES": SideCondition.TOXIC_SPIKES,
-    "WATERPLEDGE": SideCondition.WATER_PLEDGE,
-    "WIDEGUARD": SideCondition.WIDE_GUARD,
-}
