@@ -65,27 +65,7 @@ class SpecialParserCategories:
     ITEM_NAMED_STOLEN = {"Thief", "Covet"}
 
 
-def _parse_move_from_extra(raw: str) -> str:
-    move = re.sub(f"\[from\]\s?move:\s?", "", raw).strip()
-    return move
-
-
-def _parse_mon_from_extra(raw: str) -> str:
-    mon = re.sub(f"\[of\]\s?", "", raw).strip()
-    return mon
-
-
-def _parse_ability_from_extra(raw: str) -> str:
-    ability = re.sub(f"\[from\]\s?ability:\s?", "", raw).strip()
-    return ability
-
-
-def _parse_item_from_extra(raw: str) -> str:
-    item = re.sub(f"\[from\]\s?item:\s?", "", raw).strip()
-    return item
-
-
-def parse_from_effect_of(event: list[str]) -> tuple[Optional[str]]:
+def _parse_from_effect_of(event: list[str]) -> Tuple[Optional[str]]:
     """
     for the misc. "[from] item/ability/move [of] id: pokemon" messages
     """
@@ -93,13 +73,13 @@ def parse_from_effect_of(event: list[str]) -> tuple[Optional[str]]:
     for arg in event:
         if "[from]" in arg:
             if "item" in arg:
-                item = _parse_item_from_extra(arg)
+                item = re.sub(f"\[from\]\s?item:\s?", "", arg).strip()
             if "ability" in arg:
-                ability = _parse_ability_from_extra(arg)
+                ability = re.sub(f"\[from\]\s?ability:\s?", "", arg).strip()
             if "move" in arg:
-                move = _parse_move_from_extra(arg)
+                move = re.sub(f"\[from\]\s?move:\s?", "", arg).strip()
         if "[of]" in arg:
-            of_pokemon = _parse_mon_from_extra(arg)
+            of_pokemon = re.sub(f"\[of\]\s?", "", arg).strip()
     return item, ability, move, of_pokemon
 
 
@@ -639,27 +619,21 @@ class AbstractBattle(ABC):
             pokemon, stat, amount = event[2:5]
             self.get_pokemon(pokemon).boost(stat, -int(amount))
         elif event[1] == "-ability":
+            # fmt: off
             pokemon, cause = event[2:4]
-            found_item, found_ability, found_move, found_mon = parse_from_effect_of(
-                event
-            )
+            found_item, found_ability, found_move, found_mon = _parse_from_effect_of(event)
             if found_mon and found_ability:
                 if found_ability in SpecialParserCategories.ABILITY_STEALS_ABILITY:
                     # ['p1a: Porygon2', 'Clear Body', '[from] ability: Trace', '[of] p2a: Dragapult']
                     # Porygon2 has the Trace ability, copying Clear Body from Dragapult
-                    self.get_pokemon(pokemon).ability = (
-                        found_ability  # porygon has trace
-                    )
-                    self.get_pokemon(pokemon).set_temporary_ability(
-                        cause
-                    )  # but currently has clear body
-                    self.get_pokemon(found_mon).ability = (
-                        cause  # dragapult has clear body
-                    )
+                    self.get_pokemon(pokemon).ability = found_ability  # porygon has trace
+                    self.get_pokemon(pokemon).set_temporary_ability(cause)  # but currently has clear body
+                    self.get_pokemon(found_mon).ability = cause  # dragapult has clear body
             elif found_ability:
                 self.get_pokemon(pokemon).set_temporary_ability(found_ability)
             else:
                 self.get_pokemon(pokemon).ability = cause
+            # fmt: on
         elif split_message[1] == "-start":
             pokemon, effect = event[2:4]
             pokemon = self.get_pokemon(pokemon)  # type: ignore
