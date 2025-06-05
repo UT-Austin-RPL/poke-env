@@ -546,6 +546,8 @@ class Pokemon:
             self._update_from_pokedex(species)
 
     def update_from_request(self, request_pokemon: Dict[str, Any]):
+        print("update_from_request", request_pokemon)
+        input()
         self._active = request_pokemon["active"]
 
         if request_pokemon == self._last_request:
@@ -635,11 +637,65 @@ class Pokemon:
         self.switch_out()
 
     def available_moves_from_request(self, request: Dict[str, Any]) -> List[Move]:
+        # use the showdown request to get user-facing list of available moves.
+
+        # JAKE: let's Showdown do the hard work of keeping track of the available moves
+        # vs. the moves we brought to the battle. Also easily the simplest way to
+        # reliably track PP. Previous system relied on manually decrementing move._current_pp
+        # on `move` sim messages in AbstractBattle, but broke in:
+        # https://github.com/hsahovic/poke-env/issues/358. IMO there is no
+        # workaround for this; you need to manually keep track of Gen 1 PP rollovers and
+        # other edge cases. Even if you are willing to do that, Pressure is hidden
+        # in Gen 3, and the list of edge cases goes on. This is why I didn't put PP counts
+        # in Metamon observation space. Always assumed poke-env was doing it based on Showdown
+        # requests, but it was not.
+        moves: List[Move] = []
+        for move in request.get("moves", []):
+            if move.get("disabled", False):
+                continue
+            if move["id"] in self.moves:
+                existing_move = self.moves[move["id"]]
+                existing_move.update_from_request(move)
+                if self.is_dynamaxed:
+                    existing_move = existing_move.dynamaxed
+                moves.append(existing_move)
+            elif move["id"] == "hiddenpower":
+                # JAKE: original version has a special case for this, but i am yet to get it to trigger.
+                # in all my testing, the self.moves key would already be hiddenpower
+                # while the value may have the type specified ({"hiddenpower" : hiddenpowerbug (Move object)})
+                breakpoint()
+            elif move["id"] in SPECIAL_MOVES:
+                moves.append(Move(move["id"], gen=self._data.gen))
+            else:
+                reasons_to_discover_new_moves = {
+                    "copycat",
+                    "metronome",
+                    "mefirst",
+                    "mirrormove",
+                    "assist",
+                    "transform",
+                    "mimic",
+                }
+                if not reasons_to_discover_new_moves.intersection(self.moves):
+                    # JAKE: original version has a log warning for this. I've seen it trigger,
+                    # mainly in Gen 1 battles where Mimic / Transform is very hard to keep
+                    # straight. There is either a "reason_to_discover_new_moves" that we're
+                    # missing, or the original self.moves is being changed incorrectly.
+                    breakpoint()
+                # create new move
+                new_move = Move(move["id"], gen=self._data.gen)
+                # let the request give pp count
+                new_move.update_from_request(move)
+                moves.append(new_move)
+        return moves
+
+    def _old_available_moves_from_request(self, request: Dict[str, Any]) -> List[Move]:
         moves: List[Move] = []
 
         request_moves: List[str] = [
             move["id"] for move in request["moves"] if not move.get("disabled", False)
         ]
+
         for move in request_moves:
             if move in self.moves:
                 if self.is_dynamaxed:

@@ -116,7 +116,13 @@ class Move:
         return f"{self._id} (Move object)"
 
     def use(self):
+        assert False, "use should never be called"
+        # JAKE: this should never be called
+        breakpoint()
         self._current_pp -= 1
+
+    def update_from_request(self, move_request: Dict[str, Any]):
+        self._current_pp = move_request.get("pp", self._current_pp)
 
     @staticmethod
     def is_id_z(id_: str, gen: int) -> bool:
