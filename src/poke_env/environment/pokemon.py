@@ -88,7 +88,6 @@ class Pokemon:
         self._shiny: Optional[bool] = False
 
         # Battle related attributes
-
         self._active: bool = False
         self._boosts: Dict[str, int] = {
             "accuracy": 0,
@@ -133,6 +132,7 @@ class Pokemon:
         elif species:
             self._update_from_pokedex(species)
         elif teambuilder:
+            breakpoint()
             self._update_from_teambuilder(teambuilder)
 
         if name is not None:
@@ -152,19 +152,14 @@ class Pokemon:
             f"[Active: {self._active}, Status: {status_repr}]"
         )
 
-    def _add_move(self, move_id: str, use: bool = False) -> Optional[Move]:
+    def _add_move(self, move_id: str) -> Optional[Move]:
         """Store the move if applicable."""
         id_ = Move.retrieve_id(move_id)
-
         if not Move.should_be_stored(id_, self._data.gen):
             return None
-
-        if id_ not in self._moves:
+        if id_ not in self._moves and len(self._moves) < 4:
             move = Move(move_id=id_, raw_id=move_id, gen=self._data.gen)
             self._moves[id_] = move
-        if use:
-            self._moves[id_].use()
-
         return self._moves[id_]
 
     def boost(self, stat: str, amount: int):
@@ -296,10 +291,18 @@ class Pokemon:
             self._update_from_pokedex(mega_species, store_species=False)
 
     def moved(self, move_id: str, failed: bool = False, use: bool = True):
+        assert (
+            not use
+        ), "JAKE: use should never be called - change to manual pp to subtract"
         self._must_recharge = False
         self._preparing_move = None
         self._preparing_target = None
-        move = self._add_move(move_id, use=use)
+        # JAKE: this is effectively "move_id is revealed" but it would only add a move
+        # in the event that we cannot observe the Pokemon's requests (when playing
+        # an opponent that only communicates through Showdown instead of sharing
+        # the same Battle). Otherwise, we get all the info on their original and currently
+        # available moves from requests.
+        move = self._add_move(move_id)
         self._previous_move = move
         self._first_turn = False
 
@@ -310,23 +313,6 @@ class Pokemon:
 
         if self._status == Status.SLP:
             self._status_counter += 1
-
-        if len(self._moves) > 4:
-            new_moves = {}
-
-            # Keep the current move
-            if move and move in self._moves.values():
-                new_moves = {
-                    move_id: m for move_id, m in self._moves.items() if m is move
-                }
-
-            for move_name in self._moves:
-                if len(new_moves) == 4:
-                    break
-                elif move_name not in new_moves:
-                    new_moves[move_name] = self._moves[move_name]
-
-            self._moves = new_moves
 
         # Handle silent effect ending
         if Effect.GLAIVE_RUSH in self.effects:
@@ -546,8 +532,6 @@ class Pokemon:
             self._update_from_pokedex(species)
 
     def update_from_request(self, request_pokemon: Dict[str, Any]):
-        print("update_from_request", request_pokemon)
-        input()
         self._active = request_pokemon["active"]
 
         if request_pokemon == self._last_request:
@@ -573,14 +557,7 @@ class Pokemon:
             self._add_move(move)
 
         if len(self._moves) > 4:
-            moves_to_keep = {
-                Move.retrieve_id(move_id) for move_id in request_pokemon["moves"]
-            }
-            self._moves = {
-                move_id: move
-                for move_id, move in self._moves.items()
-                if move_id in moves_to_keep
-            }
+            breakpoint()
 
         if "stats" in request_pokemon:
             for stat in request_pokemon["stats"]:
@@ -641,28 +618,25 @@ class Pokemon:
 
         # JAKE: let's Showdown do the hard work of keeping track of the available moves
         # vs. the moves we brought to the battle. Also easily the simplest way to
-        # reliably track PP. Previous system relied on manually decrementing move._current_pp
-        # on `move` sim messages in AbstractBattle, but broke in:
-        # https://github.com/hsahovic/poke-env/issues/358. IMO there is no
-        # workaround for this; you need to manually keep track of Gen 1 PP rollovers and
-        # other edge cases. Even if you are willing to do that, Pressure is hidden
-        # in Gen 3, and the list of edge cases goes on. This is why I didn't put PP counts
-        # in Metamon observation space. Always assumed poke-env was doing it based on Showdown
-        # requests, but it was not.
+        # reliably track PP for players where requests are available.
         moves: List[Move] = []
         for move in request.get("moves", []):
             if move.get("disabled", False):
                 continue
-            if move["id"] in self.moves:
-                existing_move = self.moves[move["id"]]
+            # map showdown message to the same key _add_move would use
+            move_id = Move.retrieve_id(move["id"])
+            if move_id in self.moves:
+                existing_move = self.moves[move_id]
                 existing_move.update_from_request(move)
                 if self.is_dynamaxed:
                     existing_move = existing_move.dynamaxed
                 moves.append(existing_move)
-            elif move["id"] == "hiddenpower":
+            elif move_id == "hiddenpower":
                 # JAKE: original version has a special case for this, but i am yet to get it to trigger.
                 # in all my testing, the self.moves key would already be hiddenpower
                 # while the value may have the type specified ({"hiddenpower" : hiddenpowerbug (Move object)})
+                # JAKE: because Move.retrieve_id is normalizing hiddenpowerbug to hiddenpower. We should be checking
+                # for moves based on keys in self._moves
                 breakpoint()
             elif move["id"] in SPECIAL_MOVES:
                 moves.append(Move(move["id"], gen=self._data.gen))
@@ -687,45 +661,6 @@ class Pokemon:
                 # let the request give pp count
                 new_move.update_from_request(move)
                 moves.append(new_move)
-        return moves
-
-    def _old_available_moves_from_request(self, request: Dict[str, Any]) -> List[Move]:
-        moves: List[Move] = []
-
-        request_moves: List[str] = [
-            move["id"] for move in request["moves"] if not move.get("disabled", False)
-        ]
-
-        for move in request_moves:
-            if move in self.moves:
-                if self.is_dynamaxed:
-                    moves.append(self.moves[move].dynamaxed)
-                else:
-                    moves.append(self.moves[move])
-            elif move in SPECIAL_MOVES:
-                moves.append(Move(move, gen=self._data.gen))
-            elif (
-                move == "hiddenpower"
-                and len([m for m in self.moves if m.startswith("hiddenpower")]) == 1
-            ):
-                moves.append(
-                    [v for m, v in self.moves.items() if m.startswith("hiddenpower")][0]
-                )
-            else:
-                assert {
-                    "copycat",
-                    "metronome",
-                    "mefirst",
-                    "mirrormove",
-                    "assist",
-                    "transform",
-                    "mimic",
-                }.intersection(self.moves), (
-                    f"Error with move {move}. Expected self.moves to contain copycat, "
-                    "metronome, mefirst, mirrormove, assist, transform or mimic. Got"
-                    f" {self.moves}"
-                )
-                moves.append(Move(move, gen=self._data.gen))
         return moves
 
     def damage_multiplier(self, type_or_move: Union[PokemonType, Move]) -> float:
