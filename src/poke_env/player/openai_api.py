@@ -10,7 +10,7 @@ import random
 import time
 from abc import ABC, abstractmethod
 from logging import Logger
-from typing import Any, Awaitable, Callable, Dict, Generic, List, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Dict, Generic, List, Optional, Tuple, Union, Type
 
 from gymnasium.core import ActType, Env, ObsType
 from gymnasium.spaces import Discrete, Space
@@ -56,42 +56,50 @@ class _AsyncQueue:
         await self.queue.join()
 
 
-class _AsyncPlayer(Generic[ObsType, ActType], Player):
-    actions: _AsyncQueue
-    observations: _AsyncQueue
+def _create_async_player_class(parent_class: Type[Player]) -> Type[Player]:
 
-    def __init__(
-        self,
-        user_funcs: OpenAIGymEnv[ObsType, ActType],
-        username: str,
-        **kwargs: Any,
-    ):
-        self.__class__.__name__ = username
-        super().__init__(**kwargs)
-        self.__class__.__name__ = "_AsyncPlayer"
-        self.observations = _AsyncQueue(create_in_poke_loop(asyncio.Queue, 1))
-        self.actions = _AsyncQueue(create_in_poke_loop(asyncio.Queue, 1))
-        self.current_battle: Optional[AbstractBattle] = None
-        self._user_funcs = user_funcs
+    class _AsyncPlayer(Generic[ObsType, ActType], parent_class):
+        actions: _AsyncQueue
+        observations: _AsyncQueue
 
-    def choose_move(self, battle: AbstractBattle) -> Awaitable[BattleOrder]:
-        return self._env_move(battle)
+        def __init__(
+            self,
+            user_funcs: OpenAIGymEnv[ObsType, ActType],
+            username: str,
+            **kwargs: Any,
+        ):
+            self.__class__.__name__ = username
+            super().__init__(**kwargs)
+            self.__class__.__name__ = "_AsyncPlayer"
+            self.observations = _AsyncQueue(create_in_poke_loop(asyncio.Queue, 1))
+            self.actions = _AsyncQueue(create_in_poke_loop(asyncio.Queue, 1))
+            self.current_battle: Optional[AbstractBattle] = None
+            self._user_funcs = user_funcs
 
-    async def _env_move(self, battle: AbstractBattle) -> BattleOrder:
-        if not self.current_battle or self.current_battle.finished:
-            self.current_battle = battle
-        if not self.current_battle == battle:
-            raise RuntimeError("Using different battles for queues")
-        battle_to_send = self._user_funcs.embed_battle(battle)
-        await self.observations.async_put(battle_to_send)
-        action = await self.actions.async_get()
-        if action == -1:
-            return ForfeitBattleOrder()
-        return self._user_funcs.action_to_move(action, battle)
+        def choose_move(self, battle: AbstractBattle) -> Awaitable[BattleOrder]:
+            return self._env_move(battle)
 
-    def _battle_finished_callback(self, battle: AbstractBattle):
-        to_put = self._user_funcs.embed_battle(battle)
-        asyncio.run_coroutine_threadsafe(self.observations.async_put(to_put), POKE_LOOP)
+        async def _env_move(self, battle: AbstractBattle) -> BattleOrder:
+            if not self.current_battle or self.current_battle.finished:
+                self.current_battle = battle
+            if not self.current_battle == battle:
+                raise RuntimeError("Using different battles for queues")
+            battle_to_send = self._user_funcs.embed_battle(battle)
+            await self.observations.async_put(battle_to_send)
+            action = await self.actions.async_get()
+            if action == -1:
+                return ForfeitBattleOrder()
+            return self._user_funcs.action_to_move(action, battle)
+
+        def _battle_finished_callback(self, battle: AbstractBattle):
+            to_put = self._user_funcs.embed_battle(battle)
+            asyncio.run_coroutine_threadsafe(self.observations.async_put(to_put), POKE_LOOP)
+
+    return _AsyncPlayer
+
+
+# Create the default _AsyncPlayer class with Player as parent
+_AsyncPlayer = _create_async_player_class(Player)
 
 
 class OpenAIGymEnv(
@@ -109,6 +117,7 @@ class OpenAIGymEnv(
 
     def __init__(
         self,
+        player_class: Type[Player] = Player,
         account_configuration: Optional[AccountConfiguration] = None,
         *,
         avatar: Optional[int] = None,
@@ -170,7 +179,8 @@ class OpenAIGymEnv(
             leave it inactive.
         :type start_challenging: bool
         """
-        self.agent = _AsyncPlayer(
+        player_class = _create_async_player_class(player_class)
+        self.agent = player_class(
             self,
             username=self.__class__.__name__,  # type: ignore
             account_configuration=account_configuration,
