@@ -413,6 +413,9 @@ class AbstractBattle(ABC):
             self._check_damage_message_for_item(event)
             self._check_damage_message_for_ability(event)
         elif event[1] == "move":
+            # JAKE: this is inaccurate for early gens, but for some reason I left it like this
+            # during all the metamon evals. Now that we'll be doing a new `Battle`, leave as it
+            # was for backwards compatibility.
             failed = False
             override_move = None
             reveal_other_move = False
@@ -428,19 +431,8 @@ class AbstractBattle(ABC):
             if event[-1].startswith("[spread]"):
                 event = event[:-1]
 
-            if event[-1].replace(" ", "") in {
-                "[from]lockedmove",
-                "[zeffect]",
-                "[from]Pursuit",
-            }:
+            if event[-1] in {"[from]lockedmove", "[from]Pursuit", "[zeffect]"}:
                 event = event[:-1]
-
-            if event[-1].startswith("[from]"):
-                # early gen partial trapping spam, for example:
-                # '', 'move', 'p1a: Tangela', 'Bind', 'p2a: Snorlax', '[from]Bind
-                maybe_from_move = event[-1][6:]
-                if maybe_from_move == event[3]:
-                    event = event[:-1]
 
             if event[-1].startswith("[anim]"):
                 event = event[:-1]
@@ -453,14 +445,12 @@ class AbstractBattle(ABC):
                     reveal_other_move = True
                 elif override_move in {"Copycat", "Metronome", "Nature Power"}:
                     pass
-                elif override_move in {"Grass Pledge", "Water Pledge", "Fire Pledge"}:
-                    override_move = None
                 elif self.logger is not None:
                     self.logger.warning(
                         "Unmanaged [from]move message received - move %s in cleaned up "
                         "message %s in battle %s turn %d",
                         override_move,
-                        event,
+                        split_message,
                         self.battle_tag,
                         self.turn,
                     )
@@ -470,7 +460,7 @@ class AbstractBattle(ABC):
 
             if event[-1].startswith("[from]ability: "):
                 revealed_ability = event.pop()[15:]
-                pokemon = event[2]
+                pokemon = split_message[2]
                 self.get_pokemon(pokemon).ability = revealed_ability
 
                 if revealed_ability == "Magic Bounce":
@@ -482,7 +472,7 @@ class AbstractBattle(ABC):
                         "Unmanaged [from]ability: message received - ability %s in "
                         "cleaned up message %s in battle %s turn %d",
                         revealed_ability,
-                        event,
+                        split_message,
                         self.battle_tag,
                         self.turn,
                     )
@@ -519,14 +509,17 @@ class AbstractBattle(ABC):
                     )
             else:
                 pokemon, move, presumed_target = event[2:5]
-                if self.logger is not None:
-                    self.logger.warning(
-                        "Unmanaged move message format received - cleaned up message %s in "
-                        "battle %s turn %d",
-                        event,
-                        self.battle_tag,
-                        self.turn,
-                    )
+                if len(event) == 6 and "[from]" in event[-1]:
+                    pass
+                else:
+                    if self.logger is not None:
+                        self.logger.warning(
+                            "Unmanaged move message format received - cleaned up message %s in "
+                            "battle %s turn %d",
+                            event,
+                            self.battle_tag,
+                            self.turn,
+                        )
 
             # Check if a silent-effect move has occurred (Minimize) and add the effect
             if move.upper().strip() == "MINIMIZE":
@@ -540,6 +533,7 @@ class AbstractBattle(ABC):
                 self.get_pokemon(pokemon).moved(override_move, failed=failed, use=False)
             if override_move is None or reveal_other_move:
                 self.get_pokemon(pokemon).moved(move, failed=failed, use=False)
+
         elif event[1] == "cant":
             pokemon, _ = event[2:4]
             self.get_pokemon(pokemon).cant_move()
