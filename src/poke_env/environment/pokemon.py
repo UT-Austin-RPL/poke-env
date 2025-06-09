@@ -646,20 +646,11 @@ class Pokemon:
                     [v for m, v in self.moves.items() if m.startswith("hiddenpower")][0]
                 )
             else:
-                plausible_reasons_to_discover = {
-                    "copycat",
-                    "metronome",
-                    "mefirst",
-                    "mirrormove",
-                    "assist",
-                    "transform",
-                    "mimic",
-                }
-                assert plausible_reasons_to_discover.intersection(self.moves), (
-                    f"Error with move {move}. Expected self.moves to contain copycat, "
-                    "metronome, mefirst, mirrormove, assist, transform or mimic. Got"
-                    f" {self.moves.keys()}"
-                )
+                # JAKE: almost always means stolen/imitated/dynamic movesets
+                # (transform, mimic, etc.). There used to be a sanity-check
+                # for those moves here, but it fails for known reasons, as
+                # the move discovery system doesn't have enough info to handle
+                # the edge cases.
                 moves.append(Move(move, gen=self._data.gen))
         return moves
 
