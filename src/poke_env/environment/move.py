@@ -309,6 +309,7 @@ class Move:
                 "category": "Special",
                 "accuracy": 1,
                 "priority": 0,
+                "flags" : {},
                 "target": "self",
             }
         else:

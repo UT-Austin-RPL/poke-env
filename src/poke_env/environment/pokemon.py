@@ -646,7 +646,7 @@ class Pokemon:
                     [v for m, v in self.moves.items() if m.startswith("hiddenpower")][0]
                 )
             else:
-                assert {
+                plausible_reasons_to_discover = {
                     "copycat",
                     "metronome",
                     "mefirst",
@@ -654,10 +654,11 @@ class Pokemon:
                     "assist",
                     "transform",
                     "mimic",
-                }.intersection(self.moves), (
+                }
+                assert plausible_reasons_to_discover.intersection(self.moves), (
                     f"Error with move {move}. Expected self.moves to contain copycat, "
                     "metronome, mefirst, mirrormove, assist, transform or mimic. Got"
-                    f" {self.moves}"
+                    f" {self.moves.keys()}"
                 )
                 moves.append(Move(move, gen=self._data.gen))
         return moves
