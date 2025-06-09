@@ -143,6 +143,8 @@ class Player(ABC):
         )
         self._battle_end_condition: Condition = create_in_poke_loop(Condition)
         self._challenge_queue: Queue[Any] = create_in_poke_loop(Queue)
+        self._waiting: Event = create_in_poke_loop(Event)
+        self._trying_again: Event = create_in_poke_loop(Event)
         self._team: Optional[Teambuilder] = None
 
         if isinstance(team, Teambuilder):
@@ -275,9 +277,10 @@ class Player(ABC):
                 if split_message[2]:
                     request = orjson.loads(split_message[2])
                     battle.parse_request(request)
-                    if battle.move_on_next_request:
+                    if battle._wait:
+                        self._waiting.set()
+                    else:
                         await self._handle_battle_request(battle)
-                        battle.move_on_next_request = False
             elif split_message[1] == "win" or split_message[1] == "tie":
                 if split_message[1] == "win":
                     battle.won_by(split_message[2])
@@ -298,15 +301,14 @@ class Player(ABC):
                     "[Invalid choice] Sorry, too late to make a different move"
                 ):
                     if battle.trapped:
-                        await self._handle_battle_request(battle)
+                        self._trying_again.set()
                 elif split_message[2].startswith(
                     "[Unavailable choice] Can't switch: The active Pokémon is "
                     "trapped"
                 ) or split_message[2].startswith(
                     "[Invalid choice] Can't switch: The active Pokémon is trapped"
                 ):
-                    battle.trapped = True
-                    await self._handle_battle_request(battle)
+                    self._trying_again.set()
                 elif split_message[2].startswith(
                     "[Invalid choice] Can't switch: You can't switch to an active "
                     "Pokémon"
@@ -357,12 +359,6 @@ class Player(ABC):
                     await self._handle_battle_request(battle, maybe_default_order=True)
                 else:
                     self.logger.critical("Unexpected error message: %s", split_message)
-            elif split_message[1] == "turn":
-                battle.parse_message(split_message)
-                await self._handle_battle_request(battle)
-            elif split_message[1] == "teampreview":
-                battle.parse_message(split_message)
-                await self._handle_battle_request(battle, from_teampreview_request=True)
             elif split_message[1] == "bigerror":
                 self.logger.warning("Received 'bigerror' message: %s", split_message)
             elif split_message[1] == "uhtml" and split_message[2] == "otsrequest":
@@ -383,6 +379,8 @@ class Player(ABC):
                 return
             message = self.teampreview(battle)
         else:
+            if maybe_default_order:
+                self._trying_again.set()
             choice = self.choose_move(battle)
             if isinstance(choice, Awaitable):
                 choice = await choice
