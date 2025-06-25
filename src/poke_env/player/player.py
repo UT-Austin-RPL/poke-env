@@ -369,14 +369,11 @@ class Player(ABC):
     async def _handle_battle_request(
         self,
         battle: AbstractBattle,
-        from_teampreview_request: bool = False,
         maybe_default_order: bool = False,
     ):
         if maybe_default_order and random.random() < self.DEFAULT_CHOICE_CHANCE:
             message = self.choose_default_move().message
         elif battle.teampreview:
-            if not from_teampreview_request:
-                return
             message = self.teampreview(battle)
         else:
             if maybe_default_order:
