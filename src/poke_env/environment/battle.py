@@ -126,7 +126,7 @@ class Battle(AbstractBattle):
 
         if not self.trapped and self.reviving:
             for pokemon in side["pokemon"]:
-                if pokemon and pokemon.get("reviving", False):
+                if pokemon and not pokemon.get("reviving", False):
                     pokemon = self._team[pokemon["ident"]]
                     if not pokemon.active:
                         self._available_switches.append(pokemon)
