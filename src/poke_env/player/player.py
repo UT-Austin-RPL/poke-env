@@ -1,6 +1,7 @@
 """This module defines a base class for players."""
 
 import asyncio
+import time
 import random
 from abc import ABC, abstractmethod
 from asyncio import Condition, Event, Queue, Semaphore
@@ -659,21 +660,23 @@ class Player(ABC):
                 f"battle should be Battle or DoubleBattle. Received {type(battle)}"
             )
 
-    async def ladder(self, n_games: int):
+    async def ladder(self, n_games: int, sleep_between: Optional[int] = None):
         """Make the player play games on the ladder.
 
         n_games defines how many battles will be played.
 
         :param n_games: Number of battles that will be played
         :type n_games: int
+        :param sleep_between: Seconds to wait before challenging again
+        :type sleep_between: int
         """
-        await handle_threaded_coroutines(self._ladder(n_games))
+        await handle_threaded_coroutines(self._ladder(n_games, sleep_between=sleep_between))
 
-    async def _ladder(self, n_games: int):
+    async def _ladder(self, n_games: int, sleep_between: Optional[int] = None):
         await self.ps_client.logged_in.wait()
         start_time = perf_counter()
 
-        for _ in range(n_games):
+        for game_num in range(n_games):
             async with self._battle_start_condition:
                 await self.ps_client.search_ladder_game(self._format, self.next_team)
                 await self._battle_start_condition.wait()
@@ -681,6 +684,10 @@ class Player(ABC):
                     async with self._battle_end_condition:
                         await self._battle_end_condition.wait()
                 await self._battle_semaphore.acquire()
+                if game_num < n_games - 1 and sleep_between is not None:
+                    print("sleeping between games...")
+                    time.sleep(sleep_between)
+                    print("...done sleeping")
         await self._battle_count_queue.join()
         self.logger.info(
             "Laddering (%d battles) finished in %fs",
