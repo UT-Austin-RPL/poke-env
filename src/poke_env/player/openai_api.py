@@ -529,26 +529,32 @@ class OpenAIGymEnv(
         self,
         n_challenges: Optional[int] = None,
         callback: Optional[Callable[[AbstractBattle], None]] = None,
+        sleep_between: Optional[int] = None,
     ):
         if n_challenges:
             if n_challenges <= 0:
                 raise ValueError(
                     f"Number of challenges must be > 0. Got {n_challenges}"
                 )
-            for _ in range(n_challenges):
+            for game_num in range(n_challenges):
                 await self.agent.ladder(1)
                 if callback and self.current_battle is not None:
                     callback(self.current_battle)
+                if game_num < n_challenges - 1 and sleep_between is not None:
+                    await asyncio.sleep(random.randint(0, sleep_between))
         else:
             while self._keep_challenging:
                 await self.agent.ladder(1)
                 if callback and self.current_battle is not None:
                     callback(self.current_battle)
+                if sleep_between is not None:
+                    await asyncio.sleep(random.randint(0, sleep_between))
 
     def start_laddering(
         self,
         n_challenges: Optional[int] = None,
         callback: Optional[Callable[[AbstractBattle], None]] = None,
+        sleep_between: Optional[int] = None,
     ):
         """
         Starts the laddering loop.
@@ -570,7 +576,7 @@ class OpenAIGymEnv(
         if not n_challenges:
             self._keep_challenging = True
         self._challenge_task = asyncio.run_coroutine_threadsafe(
-            self._ladder_loop(n_challenges, callback), POKE_LOOP
+            self._ladder_loop(n_challenges, callback, sleep_between=sleep_between), POKE_LOOP
         )
 
     async def _stop_challenge_loop(

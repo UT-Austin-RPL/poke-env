@@ -685,9 +685,7 @@ class Player(ABC):
                         await self._battle_end_condition.wait()
                 await self._battle_semaphore.acquire()
                 if game_num < n_games - 1 and sleep_between is not None:
-                    print("sleeping between games...")
-                    time.sleep(sleep_between)
-                    print("...done sleeping")
+                    await asyncio.sleep(random.randint(0, sleep_between))
         await self._battle_count_queue.join()
         self.logger.info(
             "Laddering (%d battles) finished in %fs",
