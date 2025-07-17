@@ -854,11 +854,13 @@ class Player(ABC):
 
     @property
     def n_finished_battles(self) -> int:
-        return len([None for b in self._battles.values() if b.finished])
+        battles = list(self._battles.values())
+        return len([None for b in battles if b.finished])
 
     @property
     def n_lost_battles(self) -> int:
-        return len([None for b in self._battles.values() if b.lost])
+        battles = list(self._battles.values())
+        return len([None for b in battles if b.lost])
 
     @property
     def n_tied_battles(self) -> int:
@@ -866,7 +868,8 @@ class Player(ABC):
 
     @property
     def n_won_battles(self) -> int:
-        return len([None for b in self._battles.values() if b.won])
+        battles = list(self._battles.values())
+        return len([None for b in battles if b.won])
 
     @property
     def accept_open_team_sheet(self) -> bool:
