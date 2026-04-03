@@ -12,7 +12,7 @@ from poke_env.environment.status import Status
 from poke_env.environment.target import Target
 from poke_env.environment.weather import Weather
 
-SPECIAL_MOVES: Set[str] = {"struggle", "recharge"}
+SPECIAL_MOVES: Set[str] = {"struggle", "recharge", "fight"}
 
 _PROTECT_MOVES = {
     "protect",
@@ -302,7 +302,7 @@ class Move:
             return self._moves_dict[self._id]
         elif self._id.startswith("z") and self._id[1:] in self._moves_dict:
             return self._moves_dict[self._id[1:]]
-        elif self._id == "recharge":
+        elif self._id in {"recharge", "fight"}:
             return {
                 "pp": 1,
                 "type": "normal",
